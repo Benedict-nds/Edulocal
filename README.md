@@ -42,6 +42,3 @@ streamlit run app.py
 - `utils/grounding.py` — chunking, keyword excerpts, disclaimer heuristic
 - `sample_data/` — optional sample notes for trying the app
 
-## Security
-
-Do not commit real API keys. Keep secrets in `.env` (local only) or your environment.
