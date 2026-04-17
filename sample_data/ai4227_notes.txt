@@ -1,0 +1,14 @@
+AI 4227 — Introduction to Applied Machine Learning (sample)
+
+Week 1: Supervised learning
+- Labels y and features X; goal is to learn a mapping f so f(X) ≈ y.
+- Train/validation/test splits help estimate generalization; avoid leaking test data into model choices.
+
+Week 2: Linear models and regularization
+- Ordinary least squares minimizes squared error; ridge (L2) and lasso (L1) add penalties to reduce overfitting or induce sparsity.
+
+Week 3: Evaluation
+- Classification: accuracy can mislead on imbalanced data; use precision, recall, F1, ROC-AUC as appropriate.
+- Regression: MAE, RMSE, R²; always report uncertainty when possible.
+
+Project tip: Document data provenance, preprocessing steps, and random seeds for reproducibility.
