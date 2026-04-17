@@ -2,6 +2,8 @@
 
 A minimal **Streamlit** app for **Ghanaian university** students: paste or upload lecture notes (`.txt` / `.pdf`), ask a study question, and get answers **grounded in those notes** via the **OpenAI** API.
 
+app link: https://edulocal-nds.streamlit.app
+
 ## Features
 
 - **Note-grounded answers** — the model is instructed to use only your supplied notes and to admit when they are insufficient.
