@@ -1,13 +1,14 @@
-"""Build chat prompts from user questions, lecture notes, and response mode."""
+# Assembles OpenAI chat messages: shared grounding rules plus mode-specific system text.
 
 from typing import Literal
 
 ResponseMode = Literal["normal", "simple", "summary", "twi"]
 
-# Twi mode: exact heading lines the model must reproduce (used in prompts + post-check).
+# Twi mode: exact heading lines the model must reproduce (prompts + post-display safeguard).
 TWI_HEADING_ENGLISH = "ENGLISH (Simple Explanation):"
 TWI_HEADING_TW = "TWI-SUPPORTED EXPLANATION:"
 
+# Shared system prefix for every mode: note-only answers, admit gaps, forbid hallucinations.
 _GROUNDING = (
     "You are EduLocal Assistant, a study helper for students at Ghanaian universities. "
     "You MUST base your response ONLY on the lecture notes the user provides. "
@@ -16,6 +17,7 @@ _GROUNDING = (
     "or course details that are not supported by the notes."
 )
 
+# Mode-specific instructions appended after _GROUNDING (normal/simple/summary/twi).
 _MODE_SUFFIX: dict[ResponseMode, str] = {
     "normal": "Give a clear, accurate answer that directly addresses the question.",
     "simple": (
@@ -49,14 +51,16 @@ _MODE_SUFFIX: dict[ResponseMode, str] = {
 }
 
 
+# Concatenate global grounding with the chosen mode's suffix (unless a custom system is passed in).
 def system_prompt_for_mode(mode: ResponseMode) -> str:
     return f"{_GROUNDING} {_MODE_SUFFIX[mode]}"
 
 
+# If the model omitted Twi section headings, wrap the raw text so the UI still shows two labeled blocks.
 def ensure_twi_output_structure(text: str) -> str:
-    """If Twi-mode headings are missing, wrap raw output so the UI always shows two sections."""
     body = (text or "").strip()
     lower = body.lower()
+    # Case-insensitive check so minor capitalization drift still counts as compliant.
     has_en = "english (simple explanation):" in lower
     has_tw = "twi-supported explanation:" in lower
     if has_en and has_tw:
@@ -69,6 +73,7 @@ def ensure_twi_output_structure(text: str) -> str:
     )
 
 
+# Build [system, optional notes message, user question]; Twi mode appends a formatting reminder to the user turn.
 def build_messages(
     user_question: str,
     context: str | None = None,
@@ -87,6 +92,7 @@ def build_messages(
         )
     user_content = user_question.strip()
     if mode == "twi":
+        # Extra nudge on the user message reinforces exact headings (system prompt already mandates them).
         user_content = (
             f"{user_content}\n\n"
             f"Reminder: Start your answer with the exact line {TWI_HEADING_ENGLISH} then a blank "

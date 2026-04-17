@@ -1,4 +1,4 @@
-"""Thin wrapper around the OpenAI chat completions API."""
+# OpenAI chat completions wrapper: loads API key from environment / .env via dotenv.
 
 import os
 from typing import Iterable
@@ -9,10 +9,12 @@ from openai import OpenAI
 load_dotenv()
 
 
+# Quick check for Streamlit validation without constructing a client or raising.
 def api_key_configured() -> bool:
     return bool(os.getenv("OPENAI_API_KEY", "").strip())
 
 
+# Build a client; raises RuntimeError if the key is missing (caller shows UI error).
 def get_client() -> OpenAI:
     if not api_key_configured():
         raise RuntimeError(
@@ -21,6 +23,7 @@ def get_client() -> OpenAI:
     return OpenAI(api_key=os.getenv("OPENAI_API_KEY", "").strip())
 
 
+# Single chat completion; low temperature for steadier grounding-style answers.
 def chat_completion(
     messages: Iterable[dict[str, str]],
     model: str | None = None,

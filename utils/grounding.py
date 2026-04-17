@@ -1,4 +1,4 @@
-"""Lightweight keyword overlap: note chunks, top excerpts, and disclaimer heuristics."""
+# Lightweight note grounding: split chunks, keyword overlap for excerpts and disclaimer strength.
 
 from __future__ import annotations
 
@@ -20,6 +20,7 @@ DISCLAIMER_STRONG = (
 )
 
 
+# Tokenize for overlap: lowercase alphanumeric tokens, drop very short noise words.
 def _tokens(text: str) -> set[str]:
     return {
         w
@@ -28,8 +29,8 @@ def _tokens(text: str) -> set[str]:
     }
 
 
+# Split on blank lines first; oversized paragraphs are split on sentence boundaries, then hard-capped.
 def split_note_chunks(notes: str, max_chars: int = _MAX_CHUNK_CHARS) -> list[str]:
-    """Split notes on blank lines, then subdivide oversized blocks."""
     raw = [p.strip() for p in re.split(r"\n\s*\n", notes) if p.strip()]
     chunks: list[str] = []
     for para in raw:
@@ -49,6 +50,7 @@ def split_note_chunks(notes: str, max_chars: int = _MAX_CHUNK_CHARS) -> list[str
                 buf = sent.strip() if len(sent) <= max_chars else sent.strip()[:max_chars]
         if buf:
             chunks.append(buf.strip())
+    # Single blob with no paragraph breaks: slice into fixed-size windows for scoring.
     if not chunks and notes.strip():
         text = notes.strip()
         start = 0
@@ -58,12 +60,14 @@ def split_note_chunks(notes: str, max_chars: int = _MAX_CHUNK_CHARS) -> list[str
     return chunks
 
 
+# Count shared tokens between question and chunk (simple overlap, no embeddings).
 def keyword_overlap_score(question_tokens: set[str], chunk: str) -> int:
     if not question_tokens:
         return 0
     return len(question_tokens & _tokens(chunk))
 
 
+# Rank chunks by overlap; return top n trimmed snippets; dedupe near-identical chunks via a short prefix key.
 def top_keyword_excerpts(
     notes: str,
     question: str,
@@ -71,7 +75,6 @@ def top_keyword_excerpts(
     n: int = _DEFAULT_TOP_N,
     max_excerpt_chars: int = _MAX_EXCERPT_CHARS,
 ) -> list[str]:
-    """Return up to n short excerpts from notes with highest token overlap with the question."""
     qt = _tokens(question)
     chunks = split_note_chunks(notes)
     if not chunks:
@@ -97,7 +100,7 @@ def top_keyword_excerpts(
         if len(out) >= n:
             break
 
-    # If nothing matched (e.g. very short question tokens), show the start of the notes.
+    # No keyword hits (e.g. question too vague): still show a few opening chunks so the section is not empty.
     if not out:
         for c in chunks[:n]:
             snippet = c[:max_excerpt_chars] + ("…" if len(c) > max_excerpt_chars else "")
@@ -105,8 +108,8 @@ def top_keyword_excerpts(
     return out
 
 
+# True when overlap is weak: drives a stronger disclaimer under the model answer (heuristic, not ML).
 def weak_question_note_match(notes: str, question: str) -> bool:
-    """Heuristic: low overlap between question keywords and best-matching chunk."""
     qt = _tokens(question)
     chunks = split_note_chunks(notes)
     if not qt or not chunks:
@@ -120,5 +123,6 @@ def weak_question_note_match(notes: str, question: str) -> bool:
     return False
 
 
+# Map weak_match flag to the caption string shown under excerpts.
 def disclaimer_text(weak_match: bool) -> str:
     return DISCLAIMER_STRONG if weak_match else DISCLAIMER_STANDARD

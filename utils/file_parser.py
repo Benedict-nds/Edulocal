@@ -1,4 +1,4 @@
-"""Load text from local paths or raw bytes (.txt / .pdf)."""
+# Read lecture text from disk paths or from raw upload bytes (.txt / .pdf).
 
 import io
 from pathlib import Path
@@ -6,6 +6,7 @@ from pathlib import Path
 from pypdf import PdfReader
 
 
+# Load a UTF-8 text file from disk (CLI or tests); raises if path is not a file.
 def read_text_file(path: str | Path) -> str:
     p = Path(path)
     if not p.is_file():
@@ -13,8 +14,8 @@ def read_text_file(path: str | Path) -> str:
     return p.read_text(encoding="utf-8", errors="replace").strip()
 
 
+# Decode uploads: .txt as UTF-8 (replace errors); .pdf via pypdf page text extraction.
 def extract_text_from_bytes(filename: str, data: bytes) -> str:
-    """Return plain text from a .txt or .pdf file given its name and raw bytes."""
     name = filename.lower()
     if name.endswith(".txt"):
         return data.decode("utf-8", errors="replace").strip()

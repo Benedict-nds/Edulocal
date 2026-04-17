@@ -1,4 +1,4 @@
-"""EduLocal Assistant — Streamlit UI."""
+# EduLocal Assistant — Streamlit UI: note-grounded Q&A with optional file uploads.
 
 from __future__ import annotations
 
@@ -15,6 +15,11 @@ from utils.prompt_builder import ResponseMode, build_messages, ensure_twi_output
 
 load_dotenv()
 
+# -------------------------
+# UI CONSTANTS
+# -------------------------
+
+# Human-readable labels mapped to internal mode keys used by prompt_builder.
 MODE_OPTIONS: list[tuple[str, ResponseMode]] = [
     ("Normal Answer", "normal"),
     ("Simple Explanation", "simple"),
@@ -22,12 +27,14 @@ MODE_OPTIONS: list[tuple[str, ResponseMode]] = [
     ("Twi-Supported Explanation", "twi"),
 ]
 
+# Streamlit session_state keys: widgets bind to notes/question; upload_id resets file input.
 SESSION_NOTES = "lecture_notes"
 SESSION_QUESTION = "study_question"
 SESSION_UPLOAD_ID = "upload_id"
 SESSION_RESPONSE = "response_bundle"
 
 
+# Ensure session_state exists so text widgets and upload reset behave predictably on first load.
 def _init_session() -> None:
     if SESSION_NOTES not in st.session_state:
         st.session_state[SESSION_NOTES] = ""
@@ -37,11 +44,11 @@ def _init_session() -> None:
         st.session_state[SESSION_UPLOAD_ID] = 0
 
 
+# Merge pasted notes with decoded upload text; return one string for the model plus per-file warnings.
 def _combine_lecture_notes(
     pasted_notes: str,
     uploaded_files: list[Any] | None,
 ) -> tuple[str, list[str]]:
-    """Merge pasted text and uploaded file contents; return (combined_text, warnings)."""
     chunks: list[str] = []
     warnings: list[str] = []
     pasted = (pasted_notes or "").strip()
@@ -53,16 +60,18 @@ def _combine_lecture_notes(
             raw = f.getvalue()
             text = extract_text_from_bytes(f.name, raw)
             if text:
+                # File marker helps the model see which passage came from which upload.
                 chunks.append(f"### From file: {f.name}\n{text}")
             else:
                 warnings.append(f"No extractable text from “{f.name}”.")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:  # noqa: BLE001 — per-file failure should not crash the app
             warnings.append(f"Could not read “{f.name}”: {exc}")
 
     combined = "\n\n".join(chunks).strip()
     return combined, warnings
 
 
+# Return a user-facing error string if notes, question, or API key are missing; else None.
 def _validation_message(notes: str, question: str) -> str | None:
     if not notes.strip():
         return "Add lecture notes: paste text and/or upload a .txt or .pdf file."
@@ -73,6 +82,7 @@ def _validation_message(notes: str, question: str) -> str | None:
     return None
 
 
+# Reset inputs and bump upload_id so Streamlit creates a fresh file_uploader widget (clears files).
 def _clear_all() -> None:
     st.session_state[SESSION_NOTES] = ""
     st.session_state[SESSION_QUESTION] = ""
@@ -80,6 +90,7 @@ def _clear_all() -> None:
     st.session_state.pop(SESSION_RESPONSE, None)
 
 
+# Draw the last successful response: answer, optional keyword-based excerpts, and disclaimer caption.
 def _render_response_block(bundle: dict[str, Any]) -> None:
     st.divider()
     st.subheader("Response")
@@ -105,6 +116,10 @@ def main() -> None:
     st.set_page_config(page_title="EduLocal Assistant", page_icon="📚", layout="centered")
     _init_session()
 
+    # -------------------------
+    # INPUT HANDLING
+    # -------------------------
+
     st.title("EduLocal Assistant")
     st.markdown(
         "Study companion for **Ghanaian university** learners—ask questions grounded in "
@@ -119,6 +134,7 @@ def main() -> None:
         key=SESSION_NOTES,
     )
 
+    # Dynamic key ties to upload_id so "Clear All" forces a new uploader instance (files cleared).
     uploads = st.file_uploader(
         "Or upload notes (.txt or .pdf)",
         type=["txt", "pdf"],
@@ -153,6 +169,10 @@ def main() -> None:
     with col_gen:
         generate = st.button("Generate Response", type="primary", use_container_width=True)
 
+    # -------------------------
+    # PROCESSING (generate branch)
+    # -------------------------
+
     if generate:
         pasted = str(st.session_state.get(SESSION_NOTES, ""))
         question = str(st.session_state.get(SESSION_QUESTION, ""))
@@ -164,6 +184,7 @@ def main() -> None:
         if err:
             st.error(err)
         else:
+            # Grounding UI: overlap heuristic chooses disclaimer strength; excerpts are not sent to OpenAI.
             weak = weak_question_note_match(notes_text, question)
             excerpts = top_keyword_excerpts(notes_text, question, n=3)
             disc = disclaimer_text(weak)
@@ -177,9 +198,10 @@ def main() -> None:
                 st.error(f"OpenAI API error: {getattr(e, 'message', e)}")
             except OpenAIError as e:
                 st.error(f"OpenAI error: {e}")
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:  # noqa: BLE001 — last-resort message for unexpected failures
                 st.error(f"Something went wrong: {e}")
             else:
+                # Twi mode: enforce visible two-part headings if the model skipped them (demo-safe).
                 if mode == "twi":
                     answer = ensure_twi_output_structure(answer)
                 st.session_state[SESSION_RESPONSE] = {
@@ -188,6 +210,10 @@ def main() -> None:
                     "disclaimer": disc,
                 }
                 st.rerun()
+
+    # -------------------------
+    # OUTPUT (persisted until Clear All or new successful run)
+    # -------------------------
 
     if SESSION_RESPONSE in st.session_state:
         _render_response_block(st.session_state[SESSION_RESPONSE])
